@@ -371,7 +371,8 @@ impl Room {
     /// new event was at the supplied index in the latest_encrypted_events
     /// list.
     ///
-    /// Panics if index is not a valid index in the latest_encrypted_events list.
+    /// Panics if index is not a valid index in the latest_encrypted_events
+    /// list.
     #[cfg(feature = "e2e-encryption")]
     pub(crate) fn on_latest_event_decrypted(&mut self, event: SyncTimelineEvent, index: usize) {
         self.inner.write().unwrap().on_latest_event_decrypted(event, index);

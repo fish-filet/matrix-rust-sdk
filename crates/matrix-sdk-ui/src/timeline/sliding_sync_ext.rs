@@ -13,23 +13,10 @@
 // limitations under the License.
 
 use async_trait::async_trait;
-use imbl::Vector;
-use indexmap::IndexMap;
 use matrix_sdk::SlidingSyncRoom;
-use matrix_sdk_base::{
-    deserialized_responses::SyncTimelineEvent,
-    latest_event::{is_suitable_for_latest_event, PossibleLatestEvent},
-};
-use ruma::events::{
-    room::message::RoomMessageEventContent, AnySyncTimelineEvent, BundledMessageLikeRelations,
-    OriginalSyncMessageLikeEvent,
-};
 use tracing::{error, instrument, warn};
 
-use super::{
-    event_item::{RemoteEventOrigin, RemoteEventTimelineItem},
-    EventTimelineItem, Message, Timeline, TimelineBuilder, TimelineDetails, TimelineItemContent,
-};
+use super::{EventTimelineItem, Timeline, TimelineBuilder};
 
 #[async_trait]
 pub trait SlidingSyncRoomExt {
@@ -54,7 +41,7 @@ impl SlidingSyncRoomExt for SlidingSyncRoom {
     /// EventTimelineItem.
     #[instrument(skip_all)]
     fn latest_timeline_item(&self) -> Option<EventTimelineItem> {
-        self.latest_event().and_then(|e| wrap_latest_event(self, e))
+        self.latest_event().and_then(|e| EventTimelineItem::from_latest_event(self, e))
     }
 }
 
@@ -67,118 +54,6 @@ fn sliding_sync_timeline_builder(room: &SlidingSyncRoom) -> Option<TimelineBuild
             None
         }
     }
-}
-
-/// Wrap a low-level event from a sync into a high-level EventTimelineItem,
-/// ready to be used in the message preview in a client.
-fn wrap_latest_event(
-    room: &SlidingSyncRoom,
-    sync_event: SyncTimelineEvent,
-) -> Option<EventTimelineItem> {
-    let raw_sync_event = sync_event.event;
-
-    let encryption_info = sync_event.encryption_info;
-
-    let Ok(event) = raw_sync_event.deserialize_as::<AnySyncTimelineEvent>() else {
-        warn!("Unable to deserialize latest_event as an AnySyncTimelineEvent!");
-        return None;
-    };
-
-    let timestamp = event.origin_server_ts();
-    let sender = event.sender().to_owned();
-    let event_id = event.event_id().to_owned();
-    let is_own = room.client().user_id().map(|uid| uid == sender).unwrap_or(false);
-
-    // If we don't (yet) know how to handle this type of message, return None here.
-    // If we do, convert it into a TimelineItemContent.
-    let item_content = wrap_latest_event_content(event)?;
-
-    // We don't currently bundle any reactions with the main event. This could
-    // conceivably be wanted in the message preview in future.
-    let reactions = IndexMap::new();
-
-    // The message preview probably never needs read receipts.
-    let read_receipts = IndexMap::new();
-
-    // Being highlighted is _probably_ not relevant to the message preview.
-    let is_highlighted = false;
-
-    // We may need this, depending on how we are going to display edited messages in
-    // previews.
-    let latest_edit_json = None;
-
-    // Probably the origin of the event doesn't matter for the preview.
-    let origin = RemoteEventOrigin::Sync;
-
-    let event_kind = RemoteEventTimelineItem {
-        event_id,
-        reactions,
-        read_receipts,
-        is_own,
-        is_highlighted,
-        encryption_info,
-        original_json: raw_sync_event,
-        latest_edit_json,
-        origin,
-    }
-    .into();
-
-    // If we need to sender profiles in the message previews, we will need to
-    // cache the contents of a Profile struct inside RoomInfo similar to how we
-    // are caching the event at the moment.
-    let sender_profile = TimelineDetails::Unavailable;
-
-    Some(EventTimelineItem::new(sender, sender_profile, timestamp, item_content, event_kind))
-}
-
-fn wrap_latest_event_content(event: AnySyncTimelineEvent) -> Option<TimelineItemContent> {
-    match is_suitable_for_latest_event(&event) {
-        PossibleLatestEvent::YesMessageLike(m) => wrap_suitable_latest_event_content(m),
-        PossibleLatestEvent::NoUnsupportedEventType => {
-            // TODO: when we support state events in message previews, this will need change
-            warn!("Found a state event cached as latest_event! ID={}", event.event_id());
-            None
-        }
-        PossibleLatestEvent::NoUnsupportedMessageLikeType => {
-            // TODO: When we support reactions in message previews, this will need to change
-            warn!(
-                "Found an event cached as latest_event, but I don't know how \
-                        to wrap it in a TimelineItemContent. type={}, ID={}",
-                event.event_type().to_string(),
-                event.event_id()
-            );
-            None
-        }
-        PossibleLatestEvent::NoEncrypted => todo!(),
-        PossibleLatestEvent::NoRedacted => {
-            warn!("Found a redacted event cached as latest_event! ID={}", event.event_id());
-            None
-        }
-    }
-}
-
-fn wrap_suitable_latest_event_content(
-    message: &OriginalSyncMessageLikeEvent<RoomMessageEventContent>,
-) -> Option<TimelineItemContent> {
-    // Grab the content of this event
-    let event_content = message.content.clone();
-
-    // We don't have access to any relations via the AnySyncTimelineEvent (I think -
-    // andyb) so we pretend there are none. This might be OK for the message preview
-    // use case.
-    let relations = BundledMessageLikeRelations::new();
-
-    // If this message is a reply, we would look up in this list the message it was
-    // replying to. Since we probably won't show this in the message preview,
-    // it's probably OK to supply an empty list here.
-    // Message::from_event marks the original event as Unavailable if it can't be
-    // found inside the timeline_items.
-    let timeline_items = Vector::new();
-    Some(TimelineItemContent::Message(Message::from_event(
-        event_content,
-        relations,
-        &timeline_items,
-    )))
 }
 
 #[cfg(test)]

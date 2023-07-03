@@ -134,17 +134,19 @@ mod test {
         );
     }
 
-    // TODO: I can't write this test because I can't construct a UnsignedRoomRedactionEvent.
-    //       I asked a question in the Ruma room.
+    // TODO: I can't write this test because I can't construct a
+    // UnsignedRoomRedactionEvent.       I asked a question in the Ruma room.
     //#[test]
     //fn redacted_messages_are_unsuitable() {
-    //    let event = AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
+    //    let event =
+    // AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
     //        SyncRoomMessageEvent::Redacted(RedactedSyncMessageLikeEvent {
     //            content: RedactedRoomMessageEventContent::new(),
     //            event_id: owned_event_id!("$1"),
     //            sender: owned_user_id!("@a:b.c"),
-    //            origin_server_ts: MilliSecondsSinceUnixEpoch(UInt::new(2123).unwrap()),
-    //            unsigned: RedactedUnsigned::new(UnsignedRoomRedactionEvent::new()),
+    //            origin_server_ts:
+    // MilliSecondsSinceUnixEpoch(UInt::new(2123).unwrap()),
+    // unsigned: RedactedUnsigned::new(UnsignedRoomRedactionEvent::new()),
     //        }),
     //    ));
 
