@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Command","DenyWarnings"],"fn":["build_docs","main"],"mod":["ci","fixup","kotlin","swift","workspace"],"struct":["Xtask"],"type":["Result"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["get_device","get_other_identity","get_own_identity"]};

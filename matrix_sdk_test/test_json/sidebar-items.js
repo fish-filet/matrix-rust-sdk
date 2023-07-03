@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["api_responses","members","messages","search_users","sync","sync_events"],"static":["EMPTY","EVENT_ID","ROOM_ID"]};

@@ -1,0 +1,5 @@
+(function() {var implementors = {
+"example_emoji_verification":[["impl Args for <a class=\"struct\" href=\"example_emoji_verification/struct.Cli.html\" title=\"struct example_emoji_verification::Cli\">Cli</a>"]],
+"example_timeline":[["impl Args for <a class=\"struct\" href=\"example_timeline/struct.Cli.html\" title=\"struct example_timeline::Cli\">Cli</a>"]],
+"xtask":[["impl Args for <a class=\"struct\" href=\"xtask/kotlin/struct.KotlinArgs.html\" title=\"struct xtask::kotlin::KotlinArgs\">KotlinArgs</a>"],["impl Args for <a class=\"struct\" href=\"xtask/swift/struct.SwiftArgs.html\" title=\"struct xtask::swift::SwiftArgs\">SwiftArgs</a>"],["impl Args for <a class=\"struct\" href=\"xtask/ci/struct.CiArgs.html\" title=\"struct xtask::ci::CiArgs\">CiArgs</a>"],["impl Args for <a class=\"struct\" href=\"xtask/struct.Xtask.html\" title=\"struct xtask::Xtask\">Xtask</a>"],["impl Args for <a class=\"struct\" href=\"xtask/fixup/struct.FixupArgs.html\" title=\"struct xtask::fixup::FixupArgs\">FixupArgs</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

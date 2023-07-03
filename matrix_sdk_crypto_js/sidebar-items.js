@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["get_versions","start"],"macro":["impl_from_to_inner"],"mod":["attachment","device","encryption","events","identifiers","identities","machine","olm","requests","responses","store","sync_events","types","verification","vodozemac"],"struct":["Versions"]};

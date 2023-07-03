@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["encryption_sync","room_list_service","timeline"]};

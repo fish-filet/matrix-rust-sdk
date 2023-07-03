@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ALL_ROOMS_LIST_NAME","INVITES_LIST_NAME","VISIBLE_ROOMS_DEFAULT_RANGE","VISIBLE_ROOMS_LIST_NAME"],"enum":["Error","Input","InputResult","RoomListEntry","RoomListLoadingState","State"],"struct":["Room","RoomList","RoomListService"]};

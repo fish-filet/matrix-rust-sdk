@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["EncryptionAlgorithm","ShieldColor"],"struct":["EncryptionSettings","ShieldState"]};

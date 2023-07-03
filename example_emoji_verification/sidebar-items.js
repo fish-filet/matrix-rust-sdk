@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["login","main","print_devices","request_verification_handler","sas_verification_handler","sync","wait_for_confirmation"],"struct":["Cli"]};

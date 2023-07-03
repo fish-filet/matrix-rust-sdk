@@ -1,0 +1,179 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="`matrix-sdk-crypto-nodejs`"><title>matrix_sdk_crypto_nodejs - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../static.files/rustdoc-a23c9d150ad85d8b.css" id="mainThemeStyle"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="matrix_sdk_crypto_nodejs" data-themes="" data-resource-suffix="" data-rustdoc-version="1.72.0-nightly (839e9a6e1 2023-07-02)" data-channel="nightly" data-search-js="search-f6292fe389d70017.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ><script src="../static.files/storage-59fd9b8ccb335783.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-0795b7d26be81095.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="logo-container" href="../matrix_sdk_crypto_nodejs/index.html"><img class="rust-logo" src="../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><h2></h2></nav><nav class="sidebar"><a class="logo-container" href="../matrix_sdk_crypto_nodejs/index.html"><img class="rust-logo" src="../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><h2 class="location"><a href="#">Crate matrix_sdk_crypto_nodejs</a></h2><div class="sidebar-elems"><ul class="block"><li class="version">Version 0.6.0</li><li><a id="all-types" href="all.html">All Items</a></li></ul><section><ul class="block"><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#functions">Functions</a></li></ul></section></div></nav><main><div class="width-limiter"><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="main-heading"><h1>Crate <a class="mod" href="#">matrix_sdk_crypto_nodejs</a><button id="copy-path" title="Copy item path to clipboard"><img src="../static.files/clipboard-7571035ce49a181d.svg" width="19" height="18" alt="Copy item path"></button></h1><span class="out-of-band"><a class="srclink" href="../src/matrix_sdk_crypto_nodejs/lib.rs.html#15-57">source</a> · <button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="matrix-sdk-crypto-nodejs"><a href="#matrix-sdk-crypto-nodejs"><code>matrix-sdk-crypto-nodejs</code></a></h2>
+<p>Welcome to the <a href="https://nodejs.org/">Node.js</a> binding for the Rust <a href="https://github.com/matrix-org/matrix-rust-sdk/tree/main/crates/matrix-sdk-crypto"><code>matrix-sdk-crypto</code></a>
+library! This binding is part of the <a href="https://github.com/matrix-org/matrix-rust-sdk"><code>matrix-rust-sdk</code></a> project,
+which is a library implementation of a <a href="https://matrix.org/">Matrix</a> client-server.</p>
+<p><code>matrix-sdk-crypto-nodejs</code> is a no-network-IO implementation of a
+state machine, named <code>OlmMachine</code>, that handles E2EE (<a href="https://en.wikipedia.org/wiki/End-to-end_encryption">End-to-End
+Encryption</a>) for
+<a href="https://matrix.org/">Matrix</a> clients.</p>
+<h3 id="usage"><a href="#usage">Usage</a></h3>
+<p>Just add the latest release to your <code>package.json</code>:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ npm install --save @matrix-org/matrix-sdk-crypto-nodejs
+</code></pre></div>
+<p>When installing, NPM will download the corresponding prebuilt Rust library for your current host system. The following are supported:</p>
+<table>
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Architecture</th>
+      <th>Triple</th>
+      <th>Prebuilt available</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="5">Linux</td>
+      <td rowspan="2"><code>aarch</code></td>
+      <td><code>aarch64-unknown-linux-gnu</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><code>arm-unknown-linux-gnueabihf</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td rowspan="3"><code>amd</code></td>
+      <td><code>x86_64-unknown-linux-gnu</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><code>x86_64-unknown-linux-musl</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><code>i686-unknown-linux-gnu</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td rowspan="2">macOS</td>
+      <td><code>aarch</code></td>
+      <td><code>arch64-apple-darwin</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><code>amd</code></td>
+      <td><code>x86_64-apple-darwin</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td rowspan="3">Windows</td>
+      <td><code>aarch</code></td>
+      <td><code>aarch64-pc-windows-msvc</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><code>amd</code></td>
+      <td><code>x86_64-pc-windows-msvc</code></td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td><code>i686-pc-windows-msvc</code></td>
+      <td>✅</td>
+    </tr>
+  </tbody>
+</table>
+<h3 id="development"><a href="#development">Development</a></h3>
+<p>This Node.js binding is written in <a href="https://www.rust-lang.org/">Rust</a>. To build this binding, you
+need to install the Rust compiler, see <a href="https://www.rust-lang.org/tools/install">the Install Rust
+Page</a>. Then, the workflow is
+pretty classical by using <a href="https://www.npmjs.com/">npm</a>, see <a href="https://docs.npmjs.com/downloading-and-installing-node-js-and-npm">the Downloading and installing
+Node.js and npm
+Page</a>.</p>
+<p>The binding is compatible with, and tested against, the Node.js
+versions that are in “current”, “active” or “maintenance” states,
+according to <a href="https://nodejs.org/en/about/releases/">the Node.js Releases
+Page</a>, <em>and</em> which are
+compatible with <a href="https://nodejs.org/api/n-api.html#node-api-version-matrix">NAPI v6 (Node.js
+API)</a>. It
+means that this binding will work with the following versions: 16.0.0,
+18.0.0, 19.0.0 and 20.0.0.</p>
+<p>Once the Rust compiler, Node.js and npm are installed, you can run the
+following commands:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ npm install --ignore-scripts
+$ npm run build
+$ npm run test
+</code></pre></div>
+<p>An <code>index.js</code>, <code>index.d.ts</code> and a <code>*.node</code> files should be
+generated. At the same level of those files, you can edit a file and
+try this:</p>
+<div class="example-wrap"><pre class="language-javascript"><code>const { OlmMachine } = require(&quot;./index.js&quot;);
+
+// Let&#39;s see what we can do.
+</code></pre></div>
+<p>The <code>OlmMachine</code> state machine works in a push/pull manner:</p>
+<ul>
+<li>You push state changes and events retrieved from a Matrix homeserver
+<code>/sync</code> response, into the state machine,</li>
+<li>You pull requests that you will need to send back to the homeserver
+out of the state machine.</li>
+</ul>
+<div class="example-wrap"><pre class="language-javascript"><code>const { OlmMachine, UserId, DeviceId, RoomId, DeviceLists } = require(&quot;./index.js&quot;);
+
+async function main() {
+    // Define a user ID.
+    const alice = new UserId(&quot;@alice:example.org&quot;);
+
+    // Define a device ID.
+    const device = new DeviceId(&quot;DEVICEID&quot;);
+
+    // Let&#39;s create the `OlmMachine` state machine.
+    const machine = await OlmMachine.initialize(alice, device);
+
+    // Let&#39;s pretend we have received changes and events from a
+    // `/sync` endpoint of a Matrix homeserver, …
+    const toDeviceEvents = &quot;[]&quot;; // JSON-encoded list of events
+    const changedDevices = new DeviceLists();
+    const oneTimeKeyCounts = {};
+    const unusedFallbackKeys = [];
+
+    // … and push them into the state machine.
+    const decryptedToDevice = await machine.receiveSyncChanges(
+        toDeviceEvents,
+        changedDevices,
+        oneTimeKeyCounts,
+        unusedFallbackKeys,
+    );
+
+    // Now, let&#39;s pull requests that we need to send out to the Matrix
+    // homeserver.
+    const outgoingRequests = await machine.outgoingRequests();
+
+    // To complete the workflow, send the requests here out and call
+    // `machine.markRequestAsSent`.
+}
+
+main();
+</code></pre></div><h4 id="with-tracing-experimental"><a href="#with-tracing-experimental">With tracing (experimental)</a></h4>
+<p>If you want to enable <a href="https://tracing.rs">tracing</a>, i.e. to get the
+logs, you should re-compile the extension with the <code>tracing</code> feature
+turned on:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ npm run build -- --features tracing
+</code></pre></div>
+<p>Now, you can use the <code>MATRIX_LOG</code> environment variable to tweak the log filtering, such as:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ MATRIX_LOG=debug npm run test
+</code></pre></div>
+<p>See
+<a href="https://tracing.rs/tracing_subscriber/index.html"><code>tracing-subscriber</code></a>
+to learn more about the <code>RUST_LOG</code>/<code>MATRIX_LOG</code> environment variable.</p>
+<h5 id="using-tracing-in-dependent-projects"><a href="#using-tracing-in-dependent-projects">Using tracing in dependent projects</a></h5>
+<p>To enable tracing in client applications that import these bindings, here’s how to do it in
+a local development environment:</p>
+<ul>
+<li>In this directory, run <code>npm link</code> to make your local build of the bindings available to
+other Node projects on your system</li>
+<li>In your client app’s source directory, run <code>npm link @matrix-org/matrix-sdk-crypto-nodejs</code>
+to make it use your trace-enabled local build of the bindings</li>
+<li>In your client app’s source code, add a call to <code>initTracing</code> near startup time</li>
+<li>Run your app with the <code>MATRIX_LOG</code> environment variable set to the desired log level</li>
+</ul>
+<p>Either <code>npm link</code> command may be substituted with <code>yarn link</code>.</p>
+<h3 id="documentation"><a href="#documentation">Documentation</a></h3>
+<p><a href="https://matrix-org.github.io/matrix-rust-sdk/bindings/matrix-sdk-crypto-nodejs/">The documentation can be found
+online</a>.</p>
+<p>To generate the documentation locally, please run the following
+command:</p>
+<div class="example-wrap"><pre class="language-sh"><code>$ npm run doc
+</code></pre></div>
+<p>The documentation is generated in the <code>./docs</code> directory.</p>
+</div></details><h2 id="modules" class="small-section-header"><a href="#modules">Modules</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="attachment/index.html" title="mod matrix_sdk_crypto_nodejs::attachment">attachment</a></div></li><li><div class="item-name"><a class="mod" href="encryption/index.html" title="mod matrix_sdk_crypto_nodejs::encryption">encryption</a></div></li><li><div class="item-name"><a class="mod" href="events/index.html" title="mod matrix_sdk_crypto_nodejs::events">events</a></div><div class="desc docblock-short">Types related to events.</div></li><li><div class="item-name"><a class="mod" href="identifiers/index.html" title="mod matrix_sdk_crypto_nodejs::identifiers">identifiers</a></div><div class="desc docblock-short">Types for <a href="https://matrix.org/">Matrix</a> identifiers for devices,
+events, keys, rooms, servers, users and URIs.</div></li><li><div class="item-name"><a class="mod" href="machine/index.html" title="mod matrix_sdk_crypto_nodejs::machine">machine</a></div><div class="desc docblock-short">The crypto specific Olm objects.</div></li><li><div class="item-name"><a class="mod" href="olm/index.html" title="mod matrix_sdk_crypto_nodejs::olm">olm</a></div><div class="desc docblock-short">Olm types.</div></li><li><div class="item-name"><a class="mod" href="requests/index.html" title="mod matrix_sdk_crypto_nodejs::requests">requests</a></div><div class="desc docblock-short">Types to handle requests.</div></li><li><div class="item-name"><a class="mod" href="responses/index.html" title="mod matrix_sdk_crypto_nodejs::responses">responses</a></div></li><li><div class="item-name"><a class="mod" href="sync_events/index.html" title="mod matrix_sdk_crypto_nodejs::sync_events">sync_events</a></div><div class="desc docblock-short"><code>GET /_matrix/client/*/sync</code>.</div></li><li><div class="item-name"><a class="mod" href="types/index.html" title="mod matrix_sdk_crypto_nodejs::types">types</a></div></li><li><div class="item-name"><a class="mod" href="vodozemac/index.html" title="mod matrix_sdk_crypto_nodejs::vodozemac">vodozemac</a></div></li></ul><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2><ul class="item-table"><li><div class="item-name"><a class="struct" href="struct.Versions.html" title="struct matrix_sdk_crypto_nodejs::Versions">Versions</a></div><div class="desc docblock-short">Object containing the versions of the Rust libraries we are using.</div></li></ul><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2><ul class="item-table"><li><div class="item-name"><a class="fn" href="fn.get_versions.html" title="fn matrix_sdk_crypto_nodejs::get_versions">get_versions</a></div><div class="desc docblock-short">Get the versions of the Rust libraries we are using.</div></li></ul></section></div></main></body></html>

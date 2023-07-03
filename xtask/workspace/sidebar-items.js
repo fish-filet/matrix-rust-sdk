@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["root_path","target_path"]};

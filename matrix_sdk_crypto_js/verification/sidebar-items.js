@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CancelCode","VerificationMethod","VerificationRequestPhase"],"struct":["CancelInfo","Emoji","Qr","QrCode","QrCodeScan","Sas","VerificationRequest"]};

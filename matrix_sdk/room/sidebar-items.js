@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Room"],"struct":["Common","Invite","Invited","Joined","Left","Messages","MessagesOptions","Receipts","RoomMember"]};

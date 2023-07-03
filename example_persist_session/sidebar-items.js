@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["build_client","login","main","on_room_message","persist_sync_token","restore_session","sync"],"struct":["ClientSession","FullSession"]};

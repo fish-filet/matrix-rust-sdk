@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["KotlinCommand","Package"],"fn":["build_android_library","build_for_android_target","generate_uniffi_bindings"],"struct":["KotlinArgs","PackageValues"]};
