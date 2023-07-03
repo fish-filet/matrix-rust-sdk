@@ -578,6 +578,7 @@ impl BaseClient {
                 )
                 .await?;
 
+            #[cfg(feature = "experimental-sliding-sync")]
             for room_key_update in room_key_updates {
                 if let Some(mut room) = self.get_room(&room_key_update.room_id) {
                     self.decrypt_latest_events(&mut room).await;
@@ -598,6 +599,7 @@ impl BaseClient {
     /// found, and remove any older encrypted events from
     /// latest_encrypted_events.
     #[cfg(feature = "e2e-encryption")]
+    #[cfg(feature = "experimental-sliding-sync")]
     async fn decrypt_latest_events(&self, room: &mut Room) {
         // Try to find a message we can decrypt and is suitable for using as the latest
         // event. If we found one, set it as the latest and delete any older
@@ -614,6 +616,7 @@ impl BaseClient {
     /// decrypted event if we found one, along with its index in the
     /// latest_encrypted_events list, or None if we didn't find one.
     #[cfg(feature = "e2e-encryption")]
+    #[cfg(feature = "experimental-sliding-sync")]
     async fn decrypt_latest_suitable_event(
         &self,
         room: &Room,
@@ -1431,6 +1434,7 @@ mod tests {
     }
 
     #[cfg(feature = "e2e-encryption")]
+    #[cfg(feature = "experimental-sliding-sync")]
     #[async_test]
     async fn when_there_are_no_latest_encrypted_events_decrypting_them_does_nothing() {
         // Given a room

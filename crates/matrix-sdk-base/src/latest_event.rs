@@ -28,6 +28,8 @@ pub enum PossibleLatestEvent<'a> {
 
 /// Decide whether an event could be stored as the latest event in a room.
 /// Returns a LatestEvent representing our decision.
+#[cfg(feature = "e2e-encryption")]
+#[cfg(feature = "experimental-sliding-sync")]
 pub fn is_suitable_for_latest_event(event: &AnySyncTimelineEvent) -> PossibleLatestEvent<'_> {
     match event {
         // Suitable - we have an m.room.message that was not redacted

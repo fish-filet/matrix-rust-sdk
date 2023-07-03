@@ -778,7 +778,7 @@ mod test {
     }
 
     #[test]
-    fn dont_cache_power_level_changes_even_if_they_are_last() {
+    fn cache_the_latest_relevant_event_and_ignore_irrelevant_ones_even_if_later() {
         let event1 = make_event("m.room.message", "$1");
         let event2 = make_event("m.room.message", "$2");
         let event3 = make_event("m.room.powerlevels", "$3");
@@ -789,7 +789,7 @@ mod test {
     }
 
     #[test]
-    fn prefer_to_cache_nothing_rather_than_power_levels() {
+    fn prefer_to_cache_nothing_rather_than_irrelevant_events() {
         let event1 = make_event("m.room.power_levels", "$1");
         let events = &[event1];
         let chosen = choose_event_to_cache(events);

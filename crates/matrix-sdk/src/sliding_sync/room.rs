@@ -126,6 +126,7 @@ impl SlidingSyncRoom {
     }
 
     /// Find the latest event in this room
+    #[cfg(feature = "experimental-sliding-sync")]
     pub fn latest_event(&self) -> Option<SyncTimelineEvent> {
         self.inner.client.get_room(&self.inner.room_id).and_then(|room| room.latest_event())
     }

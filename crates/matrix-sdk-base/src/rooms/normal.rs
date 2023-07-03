@@ -352,6 +352,7 @@ impl Room {
 
     /// Return the last event in this room, if one has been cached during
     /// sliding sync
+    #[cfg(feature = "experimental-sliding-sync")]
     pub fn latest_event(&self) -> Option<SyncTimelineEvent> {
         self.inner.read().unwrap().latest_event.clone()
     }
@@ -360,7 +361,8 @@ impl Room {
     /// to decrypt these, the most recent relevant one will replace
     /// latest_event. (We can't tell which one is relevant until
     /// they are decrypted.)
-    pub fn latest_encrypted_events(&self) -> Vec<Raw<AnySyncTimelineEvent>> {
+    #[cfg(feature = "experimental-sliding-sync")]
+    pub(crate) fn latest_encrypted_events(&self) -> Vec<Raw<AnySyncTimelineEvent>> {
         self.inner.read().unwrap().latest_encrypted_events.iter().cloned().collect()
     }
 
@@ -368,7 +370,10 @@ impl Room {
     /// older encrypted events from latest_encrypted_events, given that the
     /// new event was at the supplied index in the latest_encrypted_events
     /// list.
-    pub fn on_latest_event_decrypted(&mut self, event: SyncTimelineEvent, index: usize) {
+    ///
+    /// Panics if index is not a valid index in the latest_encrypted_events list.
+    #[cfg(feature = "e2e-encryption")]
+    pub(crate) fn on_latest_event_decrypted(&mut self, event: SyncTimelineEvent, index: usize) {
         self.inner.write().unwrap().on_latest_event_decrypted(event, index);
     }
 
@@ -657,11 +662,13 @@ pub struct RoomInfo {
     #[serde(default = "encryption_state_default")] // see fn docs for why we use this default
     encryption_state_synced: bool,
     /// The last event send by sliding sync
+    #[cfg(feature = "experimental-sliding-sync")]
     pub latest_event: Option<SyncTimelineEvent>,
     /// The most recent few encrypted events. When the keys come through to
     /// decrypt these, the most recent relevant one will replace
     /// Self::latest_event. (We can't tell which one is relevant until
     /// they are decrypted.)
+    #[cfg(feature = "experimental-sliding-sync")]
     #[serde(default = "Default::default")]
     pub latest_encrypted_events: RingBuffer<Raw<AnySyncTimelineEvent>>,
     /// Base room info which holds some basic event contents important for the
@@ -706,6 +713,7 @@ fn encryption_state_default() -> bool {
 
 impl RoomInfo {
     /// The size of the latest_encrypted_events RingBuffer
+    #[cfg(feature = "experimental-sliding-sync")]
     const MAX_ENCRYPTED_EVENTS: usize = 10;
 
     #[doc(hidden)] // used by store tests, otherwise it would be pub(crate)
@@ -719,7 +727,9 @@ impl RoomInfo {
             last_prev_batch: None,
             sync_info: SyncInfo::NoState,
             encryption_state_synced: false,
+            #[cfg(feature = "experimental-sliding-sync")]
             latest_event: None,
+            #[cfg(feature = "experimental-sliding-sync")]
             latest_encrypted_events: RingBuffer::new(RoomInfo::MAX_ENCRYPTED_EVENTS),
             base_info: BaseRoomInfo::new(),
         }
@@ -918,6 +928,7 @@ impl RoomInfo {
     /// older encrypted events from latest_encrypted_events, given that the
     /// new event was at the supplied index in the latest_encrypted_events
     /// list.
+    #[cfg(feature = "experimental-sliding-sync")]
     pub fn on_latest_event_decrypted(&mut self, latest_event: SyncTimelineEvent, index: usize) {
         self.latest_event = Some(latest_event);
         self.latest_encrypted_events.drain(0..=index);
@@ -1045,6 +1056,7 @@ mod test {
     };
 
     #[test]
+    #[cfg(feature = "experimental-sliding-sync")]
     fn room_info_serialization() {
         // This test exists to make sure we don't accidentally change the
         // serialized format for `RoomInfo`.
@@ -1110,6 +1122,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "experimental-sliding-sync")]
     fn room_info_deserialization_without_optional_items() {
         // Ensure we can still deserialize RoomInfos before we added things to its
         // schema
@@ -1434,13 +1447,15 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "experimental-sliding-sync")]
     fn when_we_provide_a_newly_decrypted_event_it_replaces_latest_event() {
-        // Given a room
+        // Given a room with an encrypted event
         let (_store, mut room) = make_room(RoomState::Joined);
+        add_encrypted_event(&room, "$A");
         // Sanity: it has no latest_event
         assert!(room.latest_event().is_none());
 
-        // When I provide a latest event
+        // When I provide a decrypted event to replace the encrypted one
         let event = make_event("$A");
         room.on_latest_event_decrypted(event.clone(), 0);
 
@@ -1449,6 +1464,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "experimental-sliding-sync")]
     fn when_a_newly_decrypted_event_appears_we_delete_all_older_encrypted_events() {
         // Given a room with some encrypted events and a latest event
         let (_store, mut room) = make_room(RoomState::Joined);
@@ -1474,6 +1490,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "experimental-sliding-sync")]
     fn replacing_the_newest_event_leaves_none_left() {
         // Given a room with some encrypted events
         let (_store, mut room) = make_room(RoomState::Joined);
@@ -1492,6 +1509,7 @@ mod test {
         assert_eq!(enc_evs.len(), 0);
     }
 
+    #[cfg(feature = "experimental-sliding-sync")]
     fn add_encrypted_event(room: &Room, event_id: &str) {
         room.inner
             .write()
