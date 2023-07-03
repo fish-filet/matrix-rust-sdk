@@ -660,7 +660,7 @@ pub struct RoomInfo {
     pub latest_event: Option<SyncTimelineEvent>,
     /// The most recent few encrypted events. When the keys come through to
     /// decrypt these, the most recent relevant one will replace
-    /// latest_event. (We can't tell which one is relevant until
+    /// Self::latest_event. (We can't tell which one is relevant until
     /// they are decrypted.)
     #[serde(default = "Default::default")]
     pub latest_encrypted_events: RingBuffer<Raw<AnySyncTimelineEvent>>,
@@ -920,10 +920,7 @@ impl RoomInfo {
     /// list.
     pub fn on_latest_event_decrypted(&mut self, latest_event: SyncTimelineEvent, index: usize) {
         self.latest_event = Some(latest_event);
-        for _ in 0..(index + 1) {
-            // TODO: do this more efficiently, maybe through a drop_n method on RingBuffer?
-            self.latest_encrypted_events.pop();
-        }
+        self.latest_encrypted_events.drain(0..=index);
     }
 
     fn creator(&self) -> Option<&UserId> {
