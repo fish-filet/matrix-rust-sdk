@@ -1515,11 +1515,13 @@ dependencies = [
 [[package]]
 name = "eyeball"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01fb4d0bc50820a1c925b6b65ad230ce8ca59f689418fb35af560e41df208523"
+source = "git+https://github.com/jplatte/eyeball?rev=749c6a0b09e691d6833dbca3407be3f24808c57a#749c6a0b09e691d6833dbca3407be3f24808c57a"
 dependencies = [
  "futures-core",
  "readlock",
+ "readlock-tokio",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -4041,6 +4043,15 @@ name = "readlock"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ef31974b05e3f4f6434cddee28755180f777a470b1e9ed386de78332df4b6d"
+
+[[package]]
+name = "readlock-tokio"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c7f3e8df1d3f219cc26e5da5fd9ea7b45c8a1c715837f913a9734b4a526af89"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "redox_syscall"
