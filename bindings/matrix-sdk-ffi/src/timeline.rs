@@ -218,22 +218,22 @@ impl TimelineItem {
 #[uniffi::export]
 impl TimelineItem {
     pub fn as_event(self: Arc<Self>) -> Option<Arc<EventTimelineItem>> {
-        use matrix_sdk_ui::timeline::TimelineItem as Item;
-        unwrap_or_clone_arc_into_variant!(self, .0, Item::Event(evt) => {
+        use matrix_sdk_ui::timeline::TimelineItemKind as Kind;
+        unwrap_or_clone_arc_into_variant!(self, .0.kind, Kind::Event(evt) => {
             Arc::new(EventTimelineItem(evt))
         })
     }
 
     pub fn as_virtual(self: Arc<Self>) -> Option<VirtualTimelineItem> {
-        use matrix_sdk_ui::timeline::{TimelineItem as Item, VirtualTimelineItem as VItem};
-        match &self.0 {
-            Item::Virtual(VItem::DayDivider(ts)) => {
+        use matrix_sdk_ui::timeline::{TimelineItemKind as Kind, VirtualTimelineItem as VItem};
+        match &self.0.kind {
+            Kind::Virtual(VItem::DayDivider(ts)) => {
                 Some(VirtualTimelineItem::DayDivider { ts: ts.0.into() })
             }
-            Item::Virtual(VItem::ReadMarker) => Some(VirtualTimelineItem::ReadMarker),
-            Item::Virtual(VItem::LoadingIndicator) => Some(VirtualTimelineItem::LoadingIndicator),
-            Item::Virtual(VItem::TimelineStart) => Some(VirtualTimelineItem::TimelineStart),
-            Item::Event(_) => None,
+            Kind::Virtual(VItem::ReadMarker) => Some(VirtualTimelineItem::ReadMarker),
+            Kind::Virtual(VItem::LoadingIndicator) => Some(VirtualTimelineItem::LoadingIndicator),
+            Kind::Virtual(VItem::TimelineStart) => Some(VirtualTimelineItem::TimelineStart),
+            Kind::Event(_) => None,
         }
     }
 

@@ -66,6 +66,7 @@ use super::{
     traits::RoomDataProvider,
     AnnotationKey, EventSendState, EventTimelineItem, InReplyToDetails, Message, Profile,
     RelativePosition, RepliedToEvent, TimelineDetails, TimelineItem, TimelineItemContent,
+    TimelineItemKind,
 };
 use crate::events::SyncTimelineEventWithoutContent;
 
@@ -559,7 +560,9 @@ impl<P: RoomDataProvider> TimelineInner<P> {
 
         let is_error = matches!(send_state, EventSendState::SendingFailed { .. });
 
-        let new_item = TimelineItem::Event(item.with_kind(local_item.with_send_state(send_state)));
+        let new_item = TimelineItem::new(TimelineItemKind::Event(
+            item.with_kind(local_item.with_send_state(send_state)),
+        ));
         state.items.set(idx, Arc::new(new_item));
 
         if is_error {
@@ -573,7 +576,9 @@ impl<P: RoomDataProvider> TimelineInner<P> {
                 if matches!(&local_item.send_state, EventSendState::NotSentYet) {
                     let new_item =
                         item.with_kind(local_item.with_send_state(EventSendState::Cancelled));
-                    state.items.set(idx, Arc::new(TimelineItem::Event(new_item)));
+                    state
+                        .items
+                        .set(idx, Arc::new(TimelineItem::new(TimelineItemKind::Event(new_item))));
                 }
             }
         }
@@ -648,9 +653,9 @@ impl<P: RoomDataProvider> TimelineInner<P> {
             EventSendState::SendingFailed { .. } | EventSendState::Cancelled => {}
         }
 
-        let new_item = TimelineItem::Event(
+        let new_item = TimelineItem::new(TimelineItemKind::Event(
             item.with_kind(local_item.with_send_state(EventSendState::NotSentYet)),
-        );
+        ));
 
         let content = item.content.clone();
         state.items.set(idx, Arc::new(new_item));
@@ -853,9 +858,9 @@ impl<P: RoomDataProvider> TimelineInner<P> {
         for idx in 0..state.items.len() {
             let Some(event_item) = state.items[idx].as_event() else { continue };
             if !matches!(event_item.sender_profile(), TimelineDetails::Ready(_)) {
-                let item = Arc::new(TimelineItem::Event(
+                let item = Arc::new(TimelineItem::new(TimelineItemKind::Event(
                     event_item.with_sender_profile(profile_state.clone()),
-                ));
+                )));
                 state.items.set(idx, item);
             }
         }
@@ -882,14 +887,20 @@ impl<P: RoomDataProvider> TimelineInner<P> {
                     if !event_item.sender_profile().contains(&profile) {
                         let updated_item =
                             event_item.with_sender_profile(TimelineDetails::Ready(profile));
-                        state.items.set(idx, Arc::new(TimelineItem::Event(updated_item)));
+                        state.items.set(
+                            idx,
+                            Arc::new(TimelineItem::new(TimelineItemKind::Event(updated_item))),
+                        );
                     }
                 }
                 None => {
                     if !event_item.sender_profile().is_unavailable() {
                         let updated_item =
                             event_item.with_sender_profile(TimelineDetails::Unavailable);
-                        state.items.set(idx, Arc::new(TimelineItem::Event(updated_item)));
+                        state.items.set(
+                            idx,
+                            Arc::new(TimelineItem::new(TimelineItemKind::Event(updated_item))),
+                        );
                     }
                 }
             }
@@ -1318,7 +1329,7 @@ fn update_timeline_reaction(
         }
     }
 
-    state.items.set(idx, Arc::new(TimelineItem::Event(new_related)));
+    state.items.set(idx, Arc::new(new_related.into()));
 
     Ok(())
 }

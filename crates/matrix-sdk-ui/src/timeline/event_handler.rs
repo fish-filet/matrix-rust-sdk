@@ -53,7 +53,7 @@ use super::{
     ReactionGroup, TimelineDetails, TimelineInnerState, TimelineItem, TimelineItemContent,
     VirtualTimelineItem, DEFAULT_SANITIZER_MODE,
 };
-use crate::events::SyncTimelineEventWithoutContent;
+use crate::{events::SyncTimelineEventWithoutContent, timeline::TimelineItemKind};
 
 #[derive(Clone)]
 pub(super) enum Flow {
@@ -456,9 +456,9 @@ impl<'a> TimelineEventHandler<'a> {
                 trace!("Adding reaction");
                 self.items.set(
                     idx,
-                    Arc::new(TimelineItem::Event(
+                    Arc::new(TimelineItem::new(TimelineItemKind::Event(
                         event_item.with_kind(remote_event_item.with_reactions(reactions)),
-                    )),
+                    ))),
                 );
                 self.result.items_updated += 1;
             }
@@ -1016,7 +1016,7 @@ fn _update_timeline_item(
         trace!("Found timeline item to update");
         if let Some(new_item) = update(item) {
             trace!("Updating item");
-            items.set(idx, Arc::new(TimelineItem::Event(new_item)));
+            items.set(idx, Arc::new(new_item.into()));
             *items_updated += 1;
         }
     } else {

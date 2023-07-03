@@ -691,10 +691,9 @@ impl<S: Stream> Stream for TimelineStream<S> {
     }
 }
 
-/// A single entry in timeline.
 #[derive(Clone, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum TimelineItem {
+pub enum TimelineItemKind {
     /// An event or aggregation of multiple events.
     Event(EventTimelineItem),
     /// An item that doesn't correspond to an event, for example the user's own
@@ -702,11 +701,22 @@ pub enum TimelineItem {
     Virtual(VirtualTimelineItem),
 }
 
+/// A single entry in timeline.
+#[derive(Clone, Debug)]
+pub struct TimelineItem {
+    pub kind: TimelineItemKind,
+    pub internal_id: usize,
+}
+
 impl TimelineItem {
+    pub fn new(kind: TimelineItemKind) -> Self {
+        Self { kind, internal_id: 0 }
+    }
+
     /// Get the inner `EventTimelineItem`, if this is a `TimelineItem::Event`.
     pub fn as_event(&self) -> Option<&EventTimelineItem> {
-        match self {
-            Self::Event(v) => Some(v),
+        match &self.kind {
+            TimelineItemKind::Event(v) => Some(v),
             _ => None,
         }
     }
@@ -714,59 +724,59 @@ impl TimelineItem {
     /// Get the inner `VirtualTimelineItem`, if this is a
     /// `TimelineItem::Virtual`.
     pub fn as_virtual(&self) -> Option<&VirtualTimelineItem> {
-        match self {
-            Self::Virtual(v) => Some(v),
+        match &self.kind {
+            TimelineItemKind::Virtual(v) => Some(v),
             _ => None,
         }
     }
 
     /// Creates a new day divider from the given timestamp.
-    fn day_divider(ts: MilliSecondsSinceUnixEpoch) -> Self {
-        Self::Virtual(VirtualTimelineItem::DayDivider(ts))
+    fn day_divider(ts: MilliSecondsSinceUnixEpoch) -> TimelineItem {
+        Self::new(TimelineItemKind::Virtual(VirtualTimelineItem::DayDivider(ts)))
     }
 
-    fn read_marker() -> Self {
-        Self::Virtual(VirtualTimelineItem::ReadMarker)
+    fn read_marker() -> TimelineItem {
+        Self::new(TimelineItemKind::Virtual(VirtualTimelineItem::ReadMarker))
     }
 
-    fn loading_indicator() -> Self {
-        Self::Virtual(VirtualTimelineItem::LoadingIndicator)
+    fn loading_indicator() -> TimelineItem {
+        Self::new(TimelineItemKind::Virtual(VirtualTimelineItem::LoadingIndicator))
     }
 
-    fn timeline_start() -> Self {
-        Self::Virtual(VirtualTimelineItem::TimelineStart)
+    fn timeline_start() -> TimelineItem {
+        Self::new(TimelineItemKind::Virtual(VirtualTimelineItem::TimelineStart))
     }
 
     fn is_virtual(&self) -> bool {
-        matches!(self, Self::Virtual(_))
+        matches!(self.kind, TimelineItemKind::Virtual(_))
     }
 
     fn is_day_divider(&self) -> bool {
-        matches!(self, Self::Virtual(VirtualTimelineItem::DayDivider(_)))
+        matches!(self.kind, TimelineItemKind::Virtual(VirtualTimelineItem::DayDivider(_)))
     }
 
     fn is_read_marker(&self) -> bool {
-        matches!(self, Self::Virtual(VirtualTimelineItem::ReadMarker))
+        matches!(self.kind, TimelineItemKind::Virtual(VirtualTimelineItem::ReadMarker))
     }
 
     fn is_loading_indicator(&self) -> bool {
-        matches!(self, Self::Virtual(VirtualTimelineItem::LoadingIndicator))
+        matches!(self.kind, TimelineItemKind::Virtual(VirtualTimelineItem::LoadingIndicator))
     }
 
     fn is_timeline_start(&self) -> bool {
-        matches!(self, Self::Virtual(VirtualTimelineItem::TimelineStart))
+        matches!(self.kind, TimelineItemKind::Virtual(VirtualTimelineItem::TimelineStart))
     }
 }
 
 impl From<EventTimelineItem> for TimelineItem {
     fn from(item: EventTimelineItem) -> Self {
-        Self::Event(item)
+        Self::new(TimelineItemKind::Event(item))
     }
 }
 
 impl From<VirtualTimelineItem> for TimelineItem {
     fn from(item: VirtualTimelineItem) -> Self {
-        Self::Virtual(item)
+        Self::new(TimelineItemKind::Virtual(item))
     }
 }
 
