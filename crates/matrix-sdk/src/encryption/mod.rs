@@ -20,7 +20,6 @@ use std::{
     collections::{BTreeMap, HashSet},
     io::{Cursor, Read, Write},
     iter,
-    ops::Not as _,
     path::PathBuf,
 };
 
@@ -29,7 +28,10 @@ use futures_util::{
     future::try_join,
     stream::{self, StreamExt},
 };
-use matrix_sdk_base::crypto::{OlmMachine, OutgoingRequest, RoomMessageRequest, ToDeviceRequest};
+use matrix_sdk_base::crypto::{
+    store::locks::CryptoStoreLockGuard, OlmMachine, OutgoingRequest, RoomMessageRequest,
+    ToDeviceRequest,
+};
 use ruma::{
     api::client::{
         backup::add_backup_keys::v3::Response as KeysBackupResponse,
@@ -862,6 +864,17 @@ impl Encryption {
         let lock =
             olm_machine.store().create_store_lock("cross_process_lock".to_owned(), lock_value);
 
+        // Gently try to initialize the crypto store generation counter.
+        //
+        // If we don't get the lock immediately, then it is already acquired by another
+        // process, and we'll get to reload next time we acquire the lock.
+        {
+            let guard = lock.try_lock_once().await?;
+            if guard.is_some() {
+                olm_machine.initialize_crypto_store_generation().await?;
+            }
+        }
+
         self.client
             .inner
             .cross_process_crypto_store_lock
@@ -871,70 +884,72 @@ impl Encryption {
         Ok(())
     }
 
-    /// If a lock was created with [`Self::enable_cross_process_store_lock`],
-    /// spin-waits until the lock is available.
-    ///
-    /// May reload the `OlmMachine`, after obtaining the lock but not on the
-    /// first time.
-    pub async fn spin_lock_store(&self, max_backoff: Option<u32>) -> Result<(), Error> {
-        if let Some(lock) = self.client.inner.cross_process_crypto_store_lock.get() {
-            if lock.try_lock_once().await?.not() {
-                // We didn't get the lock on the first attempt, so that means that another
-                // process is using it. Wait for it to release it.
-                lock.spin_lock(max_backoff).await?;
-
-                // As we didn't get the lock on the first attempt, force-reload all the crypto
-                // state caches at once, by recreating the OlmMachine from scratch.
-                if let Err(err) = self.client.base_client().regenerate_olm().await {
-                    // First, give back the cross-process lock.
-                    lock.unlock().await?;
-                    // Then return the error to the caller.
-                    return Err(err.into());
-                };
+    /// Maybe reload the `OlmMachine` after acquiring the lock for the first
+    /// time.
+    async fn on_lock_newly_acquired(&self) -> Result<(), Error> {
+        let olm_machine_guard = self.client.olm_machine().await;
+        if let Some(olm_machine) = olm_machine_guard.as_ref() {
+            // If the crypto store generation has changed,
+            if olm_machine.maintain_crypto_store_generation().await? {
+                // (get rid of the reference to the current crypto store first)
+                drop(olm_machine_guard);
+                // Recreate the OlmMachine.
+                self.client.base_client().regenerate_olm().await?;
             }
         }
         Ok(())
     }
 
     /// If a lock was created with [`Self::enable_cross_process_store_lock`],
-    /// attempts to lock it once.
+    /// spin-waits until the lock is available.
     ///
-    /// Returns whether the lock was obtained or not.
-    pub async fn try_lock_store_once(&self) -> Result<bool, Error> {
+    /// May reload the `OlmMachine`, after obtaining the lock but not on the
+    /// first time.
+    pub async fn spin_lock_store(
+        &self,
+        max_backoff: Option<u32>,
+    ) -> Result<Option<CryptoStoreLockGuard>, Error> {
         if let Some(lock) = self.client.inner.cross_process_crypto_store_lock.get() {
-            return Ok(lock.try_lock_once().await?);
+            let guard = lock.spin_lock(max_backoff).await?;
+
+            self.on_lock_newly_acquired().await?;
+
+            Ok(Some(guard))
+        } else {
+            Ok(None)
         }
-        Ok(false)
     }
 
     /// If a lock was created with [`Self::enable_cross_process_store_lock`],
-    /// unlocks it.
+    /// attempts to lock it once.
     ///
-    /// This may return an error if we were not the lock's owner.
-    pub async fn unlock_store(&self) -> Result<(), Error> {
+    /// Returns a guard to the lock, if it was obtained.
+    pub async fn try_lock_store_once(&self) -> Result<Option<CryptoStoreLockGuard>, Error> {
         if let Some(lock) = self.client.inner.cross_process_crypto_store_lock.get() {
-            lock.unlock().await?;
+            let maybe_guard = lock.try_lock_once().await?;
+
+            if maybe_guard.is_some() {
+                self.on_lock_newly_acquired().await?;
+            }
+
+            Ok(maybe_guard)
+        } else {
+            Ok(None)
         }
-        Ok(())
-    }
-
-    /// Manually request that the internal crypto caches be reloaded.
-    pub async fn reload_caches(&self) -> Result<(), Error> {
-        // At this time, rleoading the `OlmMachine` ought to be sufficient.
-        self.client.base_client().regenerate_olm().await?;
-
-        Ok(())
     }
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
+    use std::time::Duration;
+
+    use matrix_sdk_base::SessionMeta;
     use matrix_sdk_test::{
         async_test, test_json, EventBuilder, GlobalAccountDataTestEvent, JoinedRoomBuilder,
         StateTestEvent,
     };
     use ruma::{
-        event_id,
+        device_id, event_id,
         events::{reaction::ReactionEventContent, relation::Annotation},
         user_id,
     };
@@ -944,7 +959,12 @@ mod tests {
         Mock, MockServer, ResponseTemplate,
     };
 
-    use crate::test_utils::logged_in_client;
+    use crate::{
+        config::RequestConfig,
+        matrix_auth::{Session, SessionTokens},
+        test_utils::logged_in_client,
+        Client,
+    };
 
     #[async_test]
     async fn test_reaction_sending() {
@@ -1063,5 +1083,88 @@ mod tests {
         // Then get_dm_room finds this room
         let found_room = client.get_dm_room(user_id).expect("DM not found!");
         assert!(found_room.get_member_no_sync(user_id).await.unwrap().is_some());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[async_test]
+    async fn test_generation_counter_invalidates_olm_machine() {
+        // Create two clients using the same sqlite database.
+        let sqlite_path = std::env::temp_dir().join("generation_counter_sqlite.db");
+        let session = Session {
+            meta: SessionMeta {
+                user_id: user_id!("@example:localhost").to_owned(),
+                device_id: device_id!("DEVICEID").to_owned(),
+            },
+            tokens: SessionTokens { access_token: "1234".to_owned(), refresh_token: None },
+        };
+
+        let client1 = Client::builder()
+            .homeserver_url("http://localhost:1234")
+            .request_config(RequestConfig::new().disable_retry())
+            .sqlite_store(&sqlite_path, None)
+            .build()
+            .await
+            .unwrap();
+        client1.matrix_auth().restore_session(session.clone()).await.unwrap();
+
+        let client2 = Client::builder()
+            .homeserver_url("http://localhost:1234")
+            .request_config(RequestConfig::new().disable_retry())
+            .sqlite_store(sqlite_path, None)
+            .build()
+            .await
+            .unwrap();
+        client2.matrix_auth().restore_session(session).await.unwrap();
+
+        // When the lock isn't enabled, any attempt at locking won't return a guard.
+        let guard = client1.encryption().try_lock_store_once().await.unwrap();
+        assert!(guard.is_none());
+
+        client1.encryption().enable_cross_process_store_lock("client1".to_owned()).await.unwrap();
+        client2.encryption().enable_cross_process_store_lock("client2".to_owned()).await.unwrap();
+
+        // One client can take the lock.
+        let acquired1 = client1.encryption().try_lock_store_once().await.unwrap();
+        assert!(acquired1.is_some());
+
+        // Keep the olm machine, so we can see if it's changed later, by comparing Arcs.
+        let initial_olm_machine =
+            client1.olm_machine().await.clone().expect("must have an olm machine");
+
+        // The other client can't take the lock too.
+        let acquired2 = client2.encryption().try_lock_store_once().await.unwrap();
+        assert!(acquired2.is_none());
+
+        // Now have the first client release the lock,
+        drop(acquired1);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // And re-take it.
+        let acquired1 = client1.encryption().try_lock_store_once().await.unwrap();
+        assert!(acquired1.is_some());
+
+        // In that case, the Olm Machine shouldn't change.
+        let olm_machine = client1.olm_machine().await.clone().expect("must have an olm machine");
+        assert!(initial_olm_machine.same_as(&olm_machine));
+
+        // Ok, release again.
+        drop(acquired1);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Client2 can acquire the lock.
+        let acquired2 = client2.encryption().try_lock_store_once().await.unwrap();
+        assert!(acquired2.is_some());
+
+        // And then release it.
+        drop(acquired2);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Client1 can acquire it again,
+        let acquired1 = client1.encryption().try_lock_store_once().await.unwrap();
+        assert!(acquired1.is_some());
+
+        // But now its olm machine has been invalidated and thus regenerated!
+        let olm_machine = client1.olm_machine().await.clone().expect("must have an olm machine");
+        assert!(!initial_olm_machine.same_as(&olm_machine));
     }
 }

@@ -63,7 +63,6 @@
 //! machine's state, which can be pretty helpful for the client app.
 
 mod room;
-#[allow(clippy::module_inception)]
 mod room_list;
 mod state;
 
@@ -75,27 +74,41 @@ use futures_util::{pin_mut, Stream, StreamExt};
 pub use matrix_sdk::RoomListEntry;
 use matrix_sdk::{
     sliding_sync::Ranges, Client, Error as SlidingSyncError, SlidingSync, SlidingSyncList,
-    SlidingSyncMode,
+    SlidingSyncListBuilder, SlidingSyncMode,
 };
 pub use room::*;
 pub use room_list::*;
 use ruma::{
-    api::client::sync::sync_events::v4::{E2EEConfig, SyncRequestListFilters, ToDeviceConfig},
+    api::client::sync::sync_events::v4::{
+        AccountDataConfig, E2EEConfig, SyncRequestListFilters, ToDeviceConfig,
+    },
     assign,
     events::{StateEventType, TimelineEventType},
     OwnedRoomId, RoomId,
 };
 pub use state::*;
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 /// The [`RoomListService`] type. See the module's documentation to learn more.
 #[derive(Debug)]
 pub struct RoomListService {
+    /// The Sliding Sync instance.
     sliding_sync: Arc<SlidingSync>,
+
+    /// The current state of the `RoomListService`.
+    ///
+    /// `RoomListService` is a simple state-machine.
+    state: Observable<State>,
+
     /// Room cache, to avoid recreating `Room`s everytime users fetch them.
     rooms: Arc<RwLock<BTreeMap<OwnedRoomId, Room>>>,
-    state: Observable<State>,
+
+    /// The current viewport ranges.
+    ///
+    /// This is useful to avoid resetting the ranges to the same value,
+    /// which would cancel the current in-flight sync request.
+    viewport_ranges: Mutex<Ranges>,
 }
 
 impl RoomListService {
@@ -119,8 +132,12 @@ impl RoomListService {
     }
 
     async fn new_internal(client: Client, with_encryption: bool) -> Result<Self, Error> {
-        let mut builder =
-            client.sliding_sync("room-list").map_err(Error::SlidingSync)?.with_common_extensions();
+        let mut builder = client
+            .sliding_sync("room-list")
+            .map_err(Error::SlidingSync)?
+            .with_account_data_extension(
+                assign!(AccountDataConfig::default(), { enabled: Some(true) }),
+            );
 
         if with_encryption {
             builder = builder
@@ -133,7 +150,7 @@ impl RoomListService {
         let sliding_sync = builder
             // TODO revert to `add_cached_list` when reloading rooms from the cache is blazingly
             // fast
-            .add_list(
+            .add_list(configure_all_or_visible_rooms_list(
                 SlidingSyncList::builder(ALL_ROOMS_LIST_NAME)
                     .sync_mode(SlidingSyncMode::new_selective().add_range(0..=19))
                     .timeline_limit(1)
@@ -141,24 +158,19 @@ impl RoomListService {
                         (StateEventType::RoomAvatar, "".to_owned()),
                         (StateEventType::RoomEncryption, "".to_owned()),
                         (StateEventType::RoomPowerLevels, "".to_owned()),
-                    ])
-                    .filters(Some(assign!(SyncRequestListFilters::default(), {
-                        is_invite: Some(false),
-                        is_tombstoned: Some(false),
-                        not_room_types: vec!["m.space".to_owned()],
-                    })))
-                    .bump_event_types(&[
-                        TimelineEventType::RoomMessage,
-                        TimelineEventType::RoomEncrypted,
-                        TimelineEventType::Sticker,
                     ]),
-            )
+            ))
             .build()
             .await
             .map(Arc::new)
             .map_err(Error::SlidingSync)?;
 
-        Ok(Self { sliding_sync, state: Observable::new(State::Init), rooms: Default::default() })
+        Ok(Self {
+            sliding_sync,
+            state: Observable::new(State::Init),
+            rooms: Default::default(),
+            viewport_ranges: Mutex::new(vec![VISIBLE_ROOMS_DEFAULT_RANGE]),
+        })
     }
 
     /// Start to sync the room list.
@@ -258,19 +270,23 @@ impl RoomListService {
     }
 
     /// Pass an [`Input`] onto the state machine.
-    pub async fn apply_input(&self, input: Input) -> Result<(), Error> {
+    pub async fn apply_input(&self, input: Input) -> Result<InputResult, Error> {
         use Input::*;
 
         match input {
-            Viewport(ranges) => {
-                self.update_viewport(ranges).await?;
-            }
+            Viewport(ranges) => self.update_viewport(ranges).await,
         }
-
-        Ok(())
     }
 
-    async fn update_viewport(&self, ranges: Ranges) -> Result<(), Error> {
+    async fn update_viewport(&self, ranges: Ranges) -> Result<InputResult, Error> {
+        let mut viewport_ranges = self.viewport_ranges.lock().await;
+
+        // Is it worth updating the viewport?
+        // The viewport has the same ranges. Don't update it.
+        if *viewport_ranges == ranges {
+            return Ok(InputResult::Ignored);
+        }
+
         self.sliding_sync
             .on_list(VISIBLE_ROOMS_LIST_NAME, |list| {
                 list.set_sync_mode(SlidingSyncMode::new_selective().add_ranges(ranges.clone()));
@@ -278,9 +294,11 @@ impl RoomListService {
                 ready(())
             })
             .await
-            .ok_or_else(|| Error::InputHasNotBeenApplied(Input::Viewport(ranges)))?;
+            .ok_or_else(|| Error::InputCannotBeApplied(Input::Viewport(ranges.clone())))?;
 
-        Ok(())
+        *viewport_ranges = ranges;
+
+        Ok(InputResult::Applied)
     }
 
     /// Get a [`Room`] if it exists.
@@ -308,6 +326,28 @@ impl RoomListService {
     }
 }
 
+/// Configure the Sliding Sync list for `ALL_ROOMS_LIST_NAME` and
+/// `VISIBLE_ROOMS_LIST_NAME`.
+///
+/// This function configures the `sort`, the `filters` and the`bump_event_types`
+/// properties, so that they are exactly the same.
+fn configure_all_or_visible_rooms_list(
+    list_builder: SlidingSyncListBuilder,
+) -> SlidingSyncListBuilder {
+    list_builder
+        .sort(vec!["by_recency".to_owned(), "by_name".to_owned()])
+        .filters(Some(assign!(SyncRequestListFilters::default(), {
+            is_invite: Some(false),
+            is_tombstoned: Some(false),
+            not_room_types: vec!["m.space".to_owned()],
+        })))
+        .bump_event_types(&[
+            TimelineEventType::RoomMessage,
+            TimelineEventType::RoomEncrypted,
+            TimelineEventType::Sticker,
+        ])
+}
+
 /// [`RoomList`]'s errors.
 #[derive(Debug, Error)]
 pub enum Error {
@@ -320,8 +360,8 @@ pub enum Error {
     UnknownList(String),
 
     /// An input was asked to be applied but it wasn't possible to apply it.
-    #[error("The input has been not applied")]
-    InputHasNotBeenApplied(Input),
+    #[error("The input cannot be applied")]
+    InputCannotBeApplied(Input),
 
     /// The requested room doesn't exist.
     #[error("Room `{0}` not found")]
@@ -340,6 +380,18 @@ pub enum Input {
     /// room list, and the viewport has changed. The viewport is defined as the
     /// range of visible rooms in the room list.
     Viewport(Ranges),
+}
+
+/// An [`Input`] Ok result: whether it's been applied, or ignored.
+#[derive(Debug, Eq, PartialEq)]
+pub enum InputResult {
+    /// The input has been applied.
+    Applied,
+
+    /// The input has been ignored.
+    ///
+    /// Note that this is not an error. The input was valid, but simply ignored.
+    Ignored,
 }
 
 #[cfg(test)]
@@ -421,6 +473,23 @@ mod tests {
                 .await,
             Some(true)
         );
+
+        Ok(())
+    }
+
+    #[async_test]
+    async fn test_no_to_device_and_e2ee_if_not_explicitly_set() -> Result<(), Error> {
+        let (client, _) = new_client().await;
+
+        let no_encryption = RoomListService::new(client.clone()).await?;
+        let extensions = no_encryption.sliding_sync.extensions_config();
+        assert_eq!(extensions.e2ee.enabled, None);
+        assert_eq!(extensions.to_device.enabled, None);
+
+        let with_encryption = RoomListService::new_with_encryption(client).await?;
+        let extensions = with_encryption.sliding_sync.extensions_config();
+        assert_eq!(extensions.e2ee.enabled, Some(true));
+        assert_eq!(extensions.to_device.enabled, Some(true));
 
         Ok(())
     }

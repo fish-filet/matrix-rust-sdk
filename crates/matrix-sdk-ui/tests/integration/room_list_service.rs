@@ -6,9 +6,10 @@ use futures_util::{pin_mut, FutureExt, StreamExt};
 use imbl::vector;
 use matrix_sdk_test::async_test;
 use matrix_sdk_ui::{
-    room_list::{
-        Error, Input, RoomListEntry, RoomListLoadingState, State, ALL_ROOMS_LIST_NAME as ALL_ROOMS,
-        INVITES_LIST_NAME as INVITES, VISIBLE_ROOMS_LIST_NAME as VISIBLE_ROOMS,
+    room_list_service::{
+        Error, Input, InputResult, RoomListEntry, RoomListLoadingState, State,
+        ALL_ROOMS_LIST_NAME as ALL_ROOMS, INVITES_LIST_NAME as INVITES,
+        VISIBLE_ROOMS_LIST_NAME as VISIBLE_ROOMS,
     },
     timeline::{TimelineItem, VirtualTimelineItem},
     RoomListService,
@@ -29,7 +30,7 @@ use crate::{
     timeline::sliding_sync::{assert_timeline_stream, timeline_event},
 };
 
-async fn new_room_list() -> Result<(MockServer, RoomListService), Error> {
+async fn new_room_list_service() -> Result<(MockServer, RoomListService), Error> {
     let (client, server) = logged_in_client().await;
     let room_list = RoomListService::new(client).await?;
 
@@ -203,7 +204,7 @@ macro_rules! assert_entries_stream {
 
 #[async_test]
 async fn test_sync_all_states() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -279,6 +280,11 @@ async fn test_sync_all_states() -> Result<(), Error> {
                         "is_tombstoned": false,
                         "not_room_types": ["m.space"],
                     },
+                    "bump_event_types": [
+                        "m.room.message",
+                        "m.room.encrypted",
+                        "m.sticker",
+                    ],
                     "sort": ["by_recency", "by_name"],
                     "timeline_limit": 20,
                 },
@@ -449,7 +455,7 @@ async fn test_sync_all_states() -> Result<(), Error> {
 
 #[async_test]
 async fn test_sync_resumes_from_previous_state() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     // Start a sync, and drop it at the end of the block.
     {
@@ -568,7 +574,7 @@ async fn test_sync_resumes_from_previous_state() -> Result<(), Error> {
 
 #[async_test]
 async fn test_sync_resumes_from_error() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -658,7 +664,7 @@ async fn test_sync_resumes_from_error() -> Result<(), Error> {
     pin_mut!(sync);
 
     // Update the viewport, just to be sure it's not reset later.
-    room_list.apply_input(Input::Viewport(vec![5..=10])).await?;
+    assert_eq!(room_list.apply_input(Input::Viewport(vec![5..=10])).await?, InputResult::Applied);
 
     // Do a regular sync from the `Error` state.
     sync_then_assert_request_and_fake_response! {
@@ -869,7 +875,7 @@ async fn test_sync_resumes_from_error() -> Result<(), Error> {
 
 #[async_test]
 async fn test_sync_resumes_from_terminated() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     // Let's stop the sync before actually syncing (we never know!).
     // We get an error, obviously.
@@ -950,7 +956,7 @@ async fn test_sync_resumes_from_terminated() -> Result<(), Error> {
     pin_mut!(sync);
 
     // Update the viewport, just to be sure it's not reset later.
-    room_list.apply_input(Input::Viewport(vec![5..=10])).await?;
+    assert_eq!(room_list.apply_input(Input::Viewport(vec![5..=10])).await?, InputResult::Applied);
 
     // Do a regular sync from the `Terminated` state.
     sync_then_assert_request_and_fake_response! {
@@ -1108,7 +1114,7 @@ async fn test_sync_resumes_from_terminated() -> Result<(), Error> {
 
 #[async_test]
 async fn test_loading_states() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1216,7 +1222,7 @@ async fn test_loading_states() -> Result<(), Error> {
 
 #[async_test]
 async fn test_entries_stream() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1351,7 +1357,7 @@ async fn test_entries_stream() -> Result<(), Error> {
 
 #[async_test]
 async fn test_entries_stream_with_updated_filter() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1492,7 +1498,7 @@ async fn test_entries_stream_with_updated_filter() -> Result<(), Error> {
 
 #[async_test]
 async fn test_invites_stream() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1650,7 +1656,7 @@ async fn test_invites_stream() -> Result<(), Error> {
 
 #[async_test]
 async fn test_room() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1733,7 +1739,7 @@ async fn test_room() -> Result<(), Error> {
 
 #[async_test]
 async fn test_room_not_found() -> Result<(), Error> {
-    let (_server, room_list) = new_room_list().await?;
+    let (_server, room_list) = new_room_list_service().await?;
 
     let room_id = room_id!("!foo:bar.org");
 
@@ -1749,7 +1755,7 @@ async fn test_room_not_found() -> Result<(), Error> {
 
 #[async_test]
 async fn test_room_subscription() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1870,7 +1876,7 @@ async fn test_room_subscription() -> Result<(), Error> {
 
 #[async_test]
 async fn test_room_unread_notifications() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -1957,7 +1963,7 @@ async fn test_room_unread_notifications() -> Result<(), Error> {
 
 #[async_test]
 async fn test_room_timeline() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -2041,7 +2047,7 @@ async fn test_room_timeline() -> Result<(), Error> {
 
 #[async_test]
 async fn test_room_latest_event() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -2132,7 +2138,7 @@ async fn test_room_latest_event() -> Result<(), Error> {
 
 #[async_test]
 async fn test_input_viewport() -> Result<(), Error> {
-    let (server, room_list) = new_room_list().await?;
+    let (server, room_list) = new_room_list_service().await?;
 
     let sync = room_list.sync();
     pin_mut!(sync);
@@ -2141,7 +2147,7 @@ async fn test_input_viewport() -> Result<(), Error> {
     // present.
     assert_matches!(
         room_list.apply_input(Input::Viewport(vec![10..=15])).await,
-        Err(Error::InputHasNotBeenApplied(_))
+        Err(Error::InputCannotBeApplied(_))
     );
 
     sync_then_assert_request_and_fake_response! {
@@ -2185,7 +2191,17 @@ async fn test_input_viewport() -> Result<(), Error> {
         },
     };
 
-    assert!(room_list.apply_input(Input::Viewport(vec![10..=15, 20..=25])).await.is_ok());
+    // Now we can change the viewport..
+    assert_eq!(
+        room_list.apply_input(Input::Viewport(vec![10..=15, 20..=25])).await?,
+        InputResult::Applied
+    );
+
+    // Re-changing the viewport has no effect.
+    assert_eq!(
+        room_list.apply_input(Input::Viewport(vec![10..=15, 20..=25])).await?,
+        InputResult::Ignored
+    );
 
     // The `timeline_limit` is not repeated because it's sticky.
     sync_then_assert_request_and_fake_response! {

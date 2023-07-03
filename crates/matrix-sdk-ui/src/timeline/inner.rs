@@ -496,25 +496,19 @@ impl<P: RoomDataProvider> TimelineInner<P> {
             _ => None,
         };
 
-        // Look for the local event by the transaction ID or event ID.
-        let result = rfind_event_item(&state.items, |it| {
-            it.transaction_id() == Some(txn_id)
-                || new_event_id.is_some() && it.event_id() == new_event_id
-        });
-
-        let Some((idx, item)) = result else {
-            // Event isn't found at all.
-            warn!("Timeline item not found, can't add event ID");
-            return;
-        };
-
-        let Some(local_item) = item.as_local() else {
+        // The local echoes are always at the end of the timeline, we must first make
+        // sure the remote echo hasn't showed up yet.
+        if rfind_event_item(&state.items, |it| {
+            new_event_id.is_some() && it.event_id() == new_event_id && it.as_remote().is_some()
+        })
+        .is_some()
+        {
             // Remote echo already received. This is very unlikely.
             trace!("Remote echo received before send-event response");
 
-            let local_echo = rfind_event_item(&state.items, |it| {
-                it.transaction_id() == Some(txn_id)
-            });
+            let local_echo =
+                rfind_event_item(&state.items, |it| it.transaction_id() == Some(txn_id));
+
             // If there's both the remote echo and a local echo, that means the
             // remote echo was received before the response *and* contained no
             // transaction ID (and thus duplicated the local echo).
@@ -526,17 +520,33 @@ impl<P: RoomDataProvider> TimelineInner<P> {
                     error!("Inconsistent state: Local echo was not preceded by day divider");
                     return;
                 }
-                if idx == state.items.len() {
-                    error!("Inconsistent state: Echo was duplicated but local echo was last");
-                    return;
-                }
 
-                if state.items[idx - 1].is_day_divider() && state.items[idx].is_day_divider() {
-                    // If local echo was the only event from that day, remove day divider.
+                if idx == state.items.len() && state.items[idx - 1].is_day_divider() {
+                    // The day divider may have been added for this local echo, remove it and let
+                    // the next message decide whether it's required or not.
                     state.items.remove(idx - 1);
                 }
             }
 
+            return;
+        }
+
+        // Look for the local event by the transaction ID or event ID.
+        let result = rfind_event_item(&state.items, |it| {
+            it.transaction_id() == Some(txn_id)
+                || new_event_id.is_some()
+                    && it.event_id() == new_event_id
+                    && it.as_local().is_some()
+        });
+
+        let Some((idx, item)) = result else {
+            // Event isn't found at all.
+            warn!("Timeline item not found, can't add event ID");
+            return;
+        };
+
+        let Some(local_item) = item.as_local() else {
+            warn!("We looked for a local item, but it transitioned to remote??");
             return;
         };
 
@@ -583,8 +593,6 @@ impl<P: RoomDataProvider> TimelineInner<P> {
         let user_id = self.room_data_provider.own_user_id();
         let annotation_key: AnnotationKey = annotation.into();
 
-        state.in_flight_reaction.remove(&annotation_key);
-
         let reaction_state = state
             .reaction_state
             .get(&AnnotationKey::from(annotation))
@@ -593,14 +601,22 @@ impl<P: RoomDataProvider> TimelineInner<P> {
         let follow_up_action = match (result, reaction_state) {
             (ReactionToggleResult::AddSuccess { event_id, .. }, ReactionState::Redacting(_)) => {
                 // A reaction was added successfully but we've been requested to undo it
+                state
+                    .in_flight_reaction
+                    .insert(annotation_key, ReactionState::Redacting(Some(event_id.to_owned())));
                 ReactionAction::RedactRemote(event_id.to_owned())
             }
             (ReactionToggleResult::RedactSuccess { .. }, ReactionState::Sending(txn_id)) => {
                 // A reaction was was redacted successfully but we've been requested to undo it
-                ReactionAction::SendRemote(txn_id.to_owned())
+                let txn_id = txn_id.to_owned();
+                state
+                    .in_flight_reaction
+                    .insert(annotation_key, ReactionState::Sending(txn_id.clone()));
+                ReactionAction::SendRemote(txn_id)
             }
             _ => {
                 // We're done, so also update the timeline
+                state.in_flight_reaction.remove(&annotation_key);
                 state.reaction_state.remove(&annotation_key);
                 update_timeline_reaction(&mut state, user_id, annotation, result)?;
 
