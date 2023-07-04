@@ -47,9 +47,9 @@ use super::{
     },
     find_read_marker,
     read_receipts::maybe_add_implicit_read_receipt,
-    rfind_event_by_id, rfind_event_item, EventTimelineItem, Message, ReactionGroup,
-    TimelineDetails, TimelineInnerState, TimelineItem, TimelineItemContent, VirtualTimelineItem,
-    DEFAULT_SANITIZER_MODE,
+    rfind_event_by_id, rfind_event_item, EventTimelineItem, Message, OtherState, ReactionGroup,
+    Sticker, TimelineDetails, TimelineInnerState, TimelineItem, TimelineItemContent,
+    VirtualTimelineItem, DEFAULT_SANITIZER_MODE,
 };
 use crate::events::SyncTimelineEventWithoutContent;
 
@@ -296,8 +296,8 @@ impl<'a> TimelineEventHandler<'a> {
                     self.add(TimelineItemContent::message(c, relations, self.items));
                 }
                 AnyMessageLikeEventContent::RoomEncrypted(c) => self.handle_room_encrypted(c),
-                AnyMessageLikeEventContent::Sticker(c) => {
-                    self.add(TimelineItemContent::sticker(c));
+                AnyMessageLikeEventContent::Sticker(content) => {
+                    self.add(TimelineItemContent::Sticker(Sticker { content }));
                 }
                 // TODO
                 _ => {
@@ -310,7 +310,7 @@ impl<'a> TimelineEventHandler<'a> {
 
             TimelineEventKind::RedactedMessage { event_type } => {
                 if event_type != MessageLikeEventType::Reaction {
-                    self.add(TimelineItemContent::redacted_message());
+                    self.add(TimelineItemContent::RedactedMessage);
                 }
             }
 
@@ -326,15 +326,15 @@ impl<'a> TimelineEventHandler<'a> {
             }
 
             TimelineEventKind::OtherState { state_key, content } => {
-                self.add(TimelineItemContent::other_state(state_key, content));
+                self.add(TimelineItemContent::OtherState(OtherState { state_key, content }));
             }
 
             TimelineEventKind::FailedToParseMessageLike { event_type, error } => {
-                self.add(TimelineItemContent::failed_to_parse_message_like(event_type, error));
+                self.add(TimelineItemContent::FailedToParseMessageLike { event_type, error });
             }
 
             TimelineEventKind::FailedToParseState { event_type, state_key, error } => {
-                self.add(TimelineItemContent::failed_to_parse_state(event_type, state_key, error));
+                self.add(TimelineItemContent::FailedToParseState { event_type, state_key, error });
             }
         }
 

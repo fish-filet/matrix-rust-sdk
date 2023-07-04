@@ -147,14 +147,6 @@ impl TimelineItemContent {
         TimelineItemContent::UnableToDecrypt(content.into())
     }
 
-    pub(crate) fn redacted_message() -> Self {
-        TimelineItemContent::RedactedMessage
-    }
-
-    pub(crate) fn sticker(content: StickerEventContent) -> Self {
-        TimelineItemContent::Sticker(Sticker { content })
-    }
-
     pub(crate) fn room_member(
         user_id: OwnedUserId,
         full_content: FullStateEventContent<RoomMemberEventContent>,
@@ -220,25 +212,6 @@ impl TimelineItemContent {
                 })
             }
         }
-    }
-
-    pub(crate) fn other_state(state_key: String, content: AnyOtherFullStateEventContent) -> Self {
-        TimelineItemContent::OtherState(OtherState { state_key, content })
-    }
-
-    pub(crate) fn failed_to_parse_message_like(
-        event_type: MessageLikeEventType,
-        error: Arc<serde_json::Error>,
-    ) -> Self {
-        TimelineItemContent::FailedToParseMessageLike { event_type, error }
-    }
-
-    pub(crate) fn failed_to_parse_state(
-        event_type: StateEventType,
-        state_key: String,
-        error: Arc<serde_json::Error>,
-    ) -> Self {
-        TimelineItemContent::FailedToParseState { event_type, state_key, error }
     }
 }
 
