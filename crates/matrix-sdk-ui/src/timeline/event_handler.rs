@@ -295,11 +295,11 @@ impl<'a> TimelineEventHandler<'a> {
                     self.handle_room_message_edit(re);
                 }
                 AnyMessageLikeEventContent::RoomMessage(c) => {
-                    self.add(NewEventTimelineItem::message(c, relations, self.items));
+                    self.add(TimelineItemContent::message(c, relations, self.items));
                 }
                 AnyMessageLikeEventContent::RoomEncrypted(c) => self.handle_room_encrypted(c),
                 AnyMessageLikeEventContent::Sticker(c) => {
-                    self.add(NewEventTimelineItem::sticker(c));
+                    self.add(TimelineItemContent::sticker(c));
                 }
                 // TODO
                 _ => {
@@ -312,7 +312,7 @@ impl<'a> TimelineEventHandler<'a> {
 
             TimelineEventKind::RedactedMessage { event_type } => {
                 if event_type != MessageLikeEventType::Reaction {
-                    self.add(NewEventTimelineItem::redacted_message());
+                    self.add(TimelineItemContent::redacted_message());
                 }
             }
 
@@ -324,19 +324,19 @@ impl<'a> TimelineEventHandler<'a> {
             }
 
             TimelineEventKind::RoomMember { user_id, content, sender } => {
-                self.add(NewEventTimelineItem::room_member(user_id, content, sender));
+                self.add(TimelineItemContent::room_member(user_id, content, sender));
             }
 
             TimelineEventKind::OtherState { state_key, content } => {
-                self.add(NewEventTimelineItem::other_state(state_key, content));
+                self.add(TimelineItemContent::other_state(state_key, content));
             }
 
             TimelineEventKind::FailedToParseMessageLike { event_type, error } => {
-                self.add(NewEventTimelineItem::failed_to_parse_message_like(event_type, error));
+                self.add(TimelineItemContent::failed_to_parse_message_like(event_type, error));
             }
 
             TimelineEventKind::FailedToParseState { event_type, state_key, error } => {
-                self.add(NewEventTimelineItem::failed_to_parse_state(event_type, state_key, error));
+                self.add(TimelineItemContent::failed_to_parse_state(event_type, state_key, error));
             }
         }
 
@@ -489,7 +489,7 @@ impl<'a> TimelineEventHandler<'a> {
     #[instrument(skip_all)]
     fn handle_room_encrypted(&mut self, c: RoomEncryptedEventContent) {
         // TODO: Handle replacements if the replaced event is also UTD
-        self.add(NewEventTimelineItem::unable_to_decrypt(c));
+        self.add(TimelineItemContent::unable_to_decrypt(c));
     }
 
     // Redacted redactions are no-ops (unfortunately)
@@ -614,10 +614,9 @@ impl<'a> TimelineEventHandler<'a> {
     }
 
     /// Add a new event item in the timeline.
-    fn add(&mut self, item: NewEventTimelineItem) {
+    fn add(&mut self, content: TimelineItemContent) {
         self.result.item_added = true;
 
-        let NewEventTimelineItem { content } = item;
         let sender = self.meta.sender.to_owned();
         let sender_profile = TimelineDetails::from_initial_value(self.meta.sender_profile.clone());
         let timestamp = self.meta.timestamp;
@@ -1054,11 +1053,7 @@ fn maybe_create_day_divider_from_timestamps(
         .then(|| TimelineItem::day_divider(new_ts))
 }
 
-struct NewEventTimelineItem {
-    content: TimelineItemContent,
-}
-
-impl NewEventTimelineItem {
+impl TimelineItemContent {
     // These constructors could also be `From` implementations, but that would
     // allow users to call them directly, which should not be supported
     fn message(
@@ -1066,22 +1061,19 @@ impl NewEventTimelineItem {
         relations: BundledMessageLikeRelations<AnySyncMessageLikeEvent>,
         timeline_items: &Vector<Arc<TimelineItem>>,
     ) -> Self {
-        let content =
-            TimelineItemContent::Message(Message::from_event(c, relations, timeline_items));
-
-        Self::from_content(content)
+        Self::Message(Message::from_event(c, relations, timeline_items))
     }
 
     fn unable_to_decrypt(content: RoomEncryptedEventContent) -> Self {
-        Self::from_content(TimelineItemContent::UnableToDecrypt(content.into()))
+        TimelineItemContent::UnableToDecrypt(content.into())
     }
 
     fn redacted_message() -> Self {
-        Self::from_content(TimelineItemContent::RedactedMessage)
+        TimelineItemContent::RedactedMessage
     }
 
     fn sticker(content: StickerEventContent) -> Self {
-        Self::from_content(TimelineItemContent::Sticker(Sticker { content }))
+        TimelineItemContent::Sticker(Sticker { content })
     }
 
     fn room_member(
@@ -1090,7 +1082,7 @@ impl NewEventTimelineItem {
         sender: OwnedUserId,
     ) -> Self {
         use ruma::events::room::member::MembershipChange as MChange;
-        let item_content = match &full_content {
+        match &full_content {
             FullStateEventContent::Original { content, prev_content } => {
                 let membership_change = content.membership_change(
                     prev_content.as_ref().map(|c| c.details()),
@@ -1148,31 +1140,25 @@ impl NewEventTimelineItem {
                     change: None,
                 })
             }
-        };
-
-        Self::from_content(item_content)
+        }
     }
 
     fn other_state(state_key: String, content: AnyOtherFullStateEventContent) -> Self {
-        Self::from_content(TimelineItemContent::OtherState(OtherState { state_key, content }))
+        TimelineItemContent::OtherState(OtherState { state_key, content })
     }
 
     fn failed_to_parse_message_like(
         event_type: MessageLikeEventType,
         error: Arc<serde_json::Error>,
-    ) -> NewEventTimelineItem {
-        Self::from_content(TimelineItemContent::FailedToParseMessageLike { event_type, error })
+    ) -> Self {
+        TimelineItemContent::FailedToParseMessageLike { event_type, error }
     }
 
     fn failed_to_parse_state(
         event_type: StateEventType,
         state_key: String,
         error: Arc<serde_json::Error>,
-    ) -> NewEventTimelineItem {
-        Self::from_content(TimelineItemContent::FailedToParseState { event_type, state_key, error })
-    }
-
-    fn from_content(content: TimelineItemContent) -> Self {
-        Self { content }
+    ) -> Self {
+        TimelineItemContent::FailedToParseState { event_type, state_key, error }
     }
 }
