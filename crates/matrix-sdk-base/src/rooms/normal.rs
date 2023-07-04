@@ -70,7 +70,7 @@ pub struct Room {
 
     /// The most recent few encrypted events. When the keys come through to
     /// decrypt these, the most recent relevant one will replace
-    /// Self::latest_event. (We can't tell which one is relevant until
+    /// `latest_event`. (We can't tell which one is relevant until
     /// they are decrypted.)
     ///
     /// Currently, these are held in Room rather than RoomInfo, because we were
