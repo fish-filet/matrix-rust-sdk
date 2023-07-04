@@ -15,7 +15,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::{Datelike, Local, TimeZone};
-use eyeball_im::{ObservableVector, Vector};
+use eyeball_im::ObservableVector;
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use matrix_sdk::deserialized_responses::EncryptionInfo;
 use ruma::{
@@ -25,13 +25,12 @@ use ruma::{
         relation::{Annotation, Replacement},
         room::{
             encrypted::RoomEncryptedEventContent,
-            member::{Change, RoomMemberEventContent},
+            member::RoomMemberEventContent,
             message::{self, sanitize::RemoveReplyFallback, MessageType, RoomMessageEventContent},
             redaction::{
                 OriginalSyncRoomRedactionEvent, RoomRedactionEventContent, SyncRoomRedactionEvent,
             },
         },
-        sticker::StickerEventContent,
         AnyMessageLikeEventContent, AnySyncMessageLikeEvent, AnySyncStateEvent,
         AnySyncTimelineEvent, BundledMessageLikeRelations, EventContent, FullStateEventContent,
         MessageLikeEventType, StateEventType, SyncStateEvent,
@@ -44,14 +43,13 @@ use tracing::{debug, error, field::debug, info, instrument, trace, warn};
 use super::{
     event_item::{
         AnyOtherFullStateEventContent, BundledReactions, EventSendState, EventTimelineItemKind,
-        LocalEventTimelineItem, MemberProfileChange, OtherState, Profile, RemoteEventOrigin,
-        RemoteEventTimelineItem, RoomMembershipChange, Sticker,
+        LocalEventTimelineItem, Profile, RemoteEventOrigin, RemoteEventTimelineItem,
     },
     find_read_marker,
     read_receipts::maybe_add_implicit_read_receipt,
-    rfind_event_by_id, rfind_event_item, EventTimelineItem, MembershipChange, Message,
-    ReactionGroup, TimelineDetails, TimelineInnerState, TimelineItem, TimelineItemContent,
-    VirtualTimelineItem, DEFAULT_SANITIZER_MODE,
+    rfind_event_by_id, rfind_event_item, EventTimelineItem, Message, ReactionGroup,
+    TimelineDetails, TimelineInnerState, TimelineItem, TimelineItemContent, VirtualTimelineItem,
+    DEFAULT_SANITIZER_MODE,
 };
 use crate::events::SyncTimelineEventWithoutContent;
 
@@ -1051,114 +1049,4 @@ fn maybe_create_day_divider_from_timestamps(
 ) -> Option<TimelineItem> {
     (timestamp_to_date(old_ts) != timestamp_to_date(new_ts))
         .then(|| TimelineItem::day_divider(new_ts))
-}
-
-impl TimelineItemContent {
-    // These constructors could also be `From` implementations, but that would
-    // allow users to call them directly, which should not be supported
-    fn message(
-        c: RoomMessageEventContent,
-        relations: BundledMessageLikeRelations<AnySyncMessageLikeEvent>,
-        timeline_items: &Vector<Arc<TimelineItem>>,
-    ) -> Self {
-        Self::Message(Message::from_event(c, relations, timeline_items))
-    }
-
-    fn unable_to_decrypt(content: RoomEncryptedEventContent) -> Self {
-        TimelineItemContent::UnableToDecrypt(content.into())
-    }
-
-    fn redacted_message() -> Self {
-        TimelineItemContent::RedactedMessage
-    }
-
-    fn sticker(content: StickerEventContent) -> Self {
-        TimelineItemContent::Sticker(Sticker { content })
-    }
-
-    fn room_member(
-        user_id: OwnedUserId,
-        full_content: FullStateEventContent<RoomMemberEventContent>,
-        sender: OwnedUserId,
-    ) -> Self {
-        use ruma::events::room::member::MembershipChange as MChange;
-        match &full_content {
-            FullStateEventContent::Original { content, prev_content } => {
-                let membership_change = content.membership_change(
-                    prev_content.as_ref().map(|c| c.details()),
-                    &sender,
-                    &user_id,
-                );
-
-                if let MChange::ProfileChanged { displayname_change, avatar_url_change } =
-                    membership_change
-                {
-                    TimelineItemContent::ProfileChange(MemberProfileChange {
-                        user_id,
-                        displayname_change: displayname_change.map(|c| Change {
-                            new: c.new.map(ToOwned::to_owned),
-                            old: c.old.map(ToOwned::to_owned),
-                        }),
-                        avatar_url_change: avatar_url_change.map(|c| Change {
-                            new: c.new.map(ToOwned::to_owned),
-                            old: c.old.map(ToOwned::to_owned),
-                        }),
-                    })
-                } else {
-                    let change = match membership_change {
-                        MChange::None => MembershipChange::None,
-                        MChange::Error => MembershipChange::Error,
-                        MChange::Joined => MembershipChange::Joined,
-                        MChange::Left => MembershipChange::Left,
-                        MChange::Banned => MembershipChange::Banned,
-                        MChange::Unbanned => MembershipChange::Unbanned,
-                        MChange::Kicked => MembershipChange::Kicked,
-                        MChange::Invited => MembershipChange::Invited,
-                        MChange::KickedAndBanned => MembershipChange::KickedAndBanned,
-                        MChange::InvitationAccepted => MembershipChange::InvitationAccepted,
-                        MChange::InvitationRejected => MembershipChange::InvitationRejected,
-                        MChange::InvitationRevoked => MembershipChange::InvitationRevoked,
-                        MChange::Knocked => MembershipChange::Knocked,
-                        MChange::KnockAccepted => MembershipChange::KnockAccepted,
-                        MChange::KnockRetracted => MembershipChange::KnockRetracted,
-                        MChange::KnockDenied => MembershipChange::KnockDenied,
-                        MChange::ProfileChanged { .. } => unreachable!(),
-                        _ => MembershipChange::NotImplemented,
-                    };
-
-                    TimelineItemContent::MembershipChange(RoomMembershipChange {
-                        user_id,
-                        content: full_content,
-                        change: Some(change),
-                    })
-                }
-            }
-            FullStateEventContent::Redacted(_) => {
-                TimelineItemContent::MembershipChange(RoomMembershipChange {
-                    user_id,
-                    content: full_content,
-                    change: None,
-                })
-            }
-        }
-    }
-
-    fn other_state(state_key: String, content: AnyOtherFullStateEventContent) -> Self {
-        TimelineItemContent::OtherState(OtherState { state_key, content })
-    }
-
-    fn failed_to_parse_message_like(
-        event_type: MessageLikeEventType,
-        error: Arc<serde_json::Error>,
-    ) -> Self {
-        TimelineItemContent::FailedToParseMessageLike { event_type, error }
-    }
-
-    fn failed_to_parse_state(
-        event_type: StateEventType,
-        state_key: String,
-        error: Arc<serde_json::Error>,
-    ) -> Self {
-        TimelineItemContent::FailedToParseState { event_type, state_key, error }
-    }
 }
