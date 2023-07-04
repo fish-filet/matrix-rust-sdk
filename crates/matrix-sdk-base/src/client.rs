@@ -563,6 +563,7 @@ impl BaseClient {
         changed_devices: &api::sync::sync_events::DeviceLists,
         one_time_keys_counts: &BTreeMap<ruma::DeviceKeyAlgorithm, UInt>,
         unused_fallback_keys: Option<&[ruma::DeviceKeyAlgorithm]>,
+        changes: &mut StateChanges,
     ) -> Result<Vec<Raw<ruma::events::AnyToDeviceEvent>>> {
         if let Some(o) = self.olm_machine().await.as_ref() {
             // Let the crypto machine handle the sync response, this
@@ -581,7 +582,7 @@ impl BaseClient {
             #[cfg(feature = "experimental-sliding-sync")]
             for room_key_update in room_key_updates {
                 if let Some(mut room) = self.get_room(&room_key_update.room_id) {
-                    self.decrypt_latest_events(&mut room).await;
+                    self.decrypt_latest_events(&mut room, changes).await;
                 }
             }
 
@@ -600,12 +601,13 @@ impl BaseClient {
     /// latest_encrypted_events.
     #[cfg(feature = "e2e-encryption")]
     #[cfg(feature = "experimental-sliding-sync")]
-    async fn decrypt_latest_events(&self, room: &mut Room) {
+    async fn decrypt_latest_events(&self, room: &mut Room, changes: &mut StateChanges) {
         // Try to find a message we can decrypt and is suitable for using as the latest
         // event. If we found one, set it as the latest and delete any older
         // encrypted events
         if let Some((found, found_index)) = self.decrypt_latest_suitable_event(room).await {
-            room.on_latest_event_decrypted(found, found_index)
+            room.on_latest_event_decrypted(found, found_index);
+            changes.room_infos.insert(room.room_id().to_owned(), room.clone_info());
         }
     }
 
@@ -706,6 +708,7 @@ impl BaseClient {
         }
 
         let now = Instant::now();
+        let mut changes = Box::new(StateChanges::new(response.next_batch.clone()));
 
         #[cfg(feature = "e2e-encryption")]
         let to_device = self
@@ -714,13 +717,13 @@ impl BaseClient {
                 &response.device_lists,
                 &response.device_one_time_keys_count,
                 response.device_unused_fallback_key_types.as_deref(),
+                &mut changes,
             )
             .await?;
 
         #[cfg(not(feature = "e2e-encryption"))]
         let to_device = response.to_device.events;
 
-        let mut changes = Box::new(StateChanges::new(response.next_batch.clone()));
         let mut ambiguity_cache = AmbiguityCache::new(self.store.inner.clone());
 
         self.handle_account_data(&response.account_data.events, &mut changes).await;
@@ -1297,7 +1300,7 @@ mod tests {
     use serde_json::json;
 
     use super::BaseClient;
-    use crate::{DisplayName, Room, RoomState, SessionMeta};
+    use crate::{DisplayName, Room, RoomState, SessionMeta, StateChanges};
 
     #[async_test]
     async fn invite_after_leaving() {
@@ -1448,11 +1451,13 @@ mod tests {
         assert!(room.latest_event().is_none());
 
         // When I tell it to do some decryption
-        client.decrypt_latest_events(&mut room).await;
+        let mut changes = StateChanges::default();
+        client.decrypt_latest_events(&mut room, &mut changes).await;
 
         // Then nothing changed
         assert!(room.latest_encrypted_events().is_empty());
         assert!(room.latest_event().is_none());
+        assert!(changes.room_infos.is_empty());
     }
 
     // TODO: I wanted to write more tests here for decrypt_latest_events but I got

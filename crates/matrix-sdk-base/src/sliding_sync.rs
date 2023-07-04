@@ -80,6 +80,8 @@ impl BaseClient {
                 e2ee.device_unused_fallback_key_types.as_ref().map(|v| v.len())
         );
 
+        let mut changes = StateChanges::default();
+
         // Process the to-device events and other related e2ee data. This returns a list
         // of all the to-device events that were passed in but encrypted ones
         // were replaced with their decrypted version.
@@ -93,11 +95,11 @@ impl BaseClient {
                 &e2ee.device_lists,
                 &e2ee.device_one_time_keys_count,
                 e2ee.device_unused_fallback_key_types.as_deref(),
+                &mut changes
             )
             .await?;
 
         let store = self.store.clone();
-        let mut changes = StateChanges::default();
         let mut ambiguity_cache = AmbiguityCache::new(store.inner.clone());
 
         if !account_data.is_empty() {
