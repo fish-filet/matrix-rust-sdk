@@ -34,7 +34,7 @@ use stream_assert::assert_next_matches;
 
 use super::{sync_timeline_event, TestTimeline, ALICE, BOB};
 use crate::timeline::{
-    event_item::AnyOtherFullStateEventContent, MembershipChange, TimelineDetails, TimelineItem,
+    event_item::AnyOtherFullStateEventContent, MembershipChange, TimelineDetails,
     TimelineItemContent, TimelineItemKind, VirtualTimelineItem,
 };
 

@@ -16,7 +16,7 @@
 //!
 //! See [`Timeline`] for details.
 
-use std::{pin::Pin, sync::Arc, task::Poll, time::Duration};
+use std::{ops::Deref, pin::Pin, sync::Arc, task::Poll, time::Duration};
 
 use async_std::sync::{Condvar, Mutex};
 use eyeball_im::VectorDiff;
@@ -390,7 +390,7 @@ impl Timeline {
         let room = self.joined_room();
 
         let Ok(room) = room else {
-            return ReactionToggleResult::RedactFailure { event_id: event_id.to_owned() }
+            return ReactionToggleResult::RedactFailure { event_id: event_id.to_owned() };
         };
 
         let response = room.redact(event_id, no_reason.reason.as_deref(), Some(txn_id)).await;
@@ -408,9 +408,7 @@ impl Timeline {
         txn_id: OwnedTransactionId,
     ) -> ReactionToggleResult {
         let room = self.joined_room();
-        let Ok(room) = room else {
-            return ReactionToggleResult::AddFailure { txn_id }
-        };
+        let Ok(room) = room else { return ReactionToggleResult::AddFailure { txn_id } };
 
         let event_content =
             AnyMessageLikeEventContent::Reaction(ReactionEventContent::from(annotation.clone()));
@@ -704,12 +702,12 @@ pub enum TimelineItemKind {
 /// A single entry in timeline.
 #[derive(Clone, Debug)]
 pub struct TimelineItem {
-    pub kind: TimelineItemKind,
-    pub internal_id: usize,
+    kind: TimelineItemKind,
+    internal_id: usize,
 }
 
 impl TimelineItem {
-    pub fn new(kind: TimelineItemKind) -> Self {
+    pub(crate) fn new(kind: TimelineItemKind) -> Self {
         Self { kind, internal_id: 0 }
     }
 
@@ -728,6 +726,17 @@ impl TimelineItem {
             TimelineItemKind::Virtual(v) => Some(v),
             _ => None,
         }
+    }
+
+    /// Get a unique ID for this timeline item.
+    ///
+    /// It identifies the item on a best-effort basis. For instance, edits to an
+    /// [`EventTimelineItem`] will not change the ID of the enclosing
+    /// `TimelineItem`. For some virtual items like day dividers, identity isn't
+    /// easy to define though and you might see a new ID getting generated for a
+    /// day divider that you perceive to be "the same" as a previous one.
+    pub fn unique_id(&self) -> usize {
+        self.internal_id
     }
 
     /// Creates a new day divider from the given timestamp.
@@ -765,6 +774,14 @@ impl TimelineItem {
 
     fn is_timeline_start(&self) -> bool {
         matches!(self.kind, TimelineItemKind::Virtual(VirtualTimelineItem::TimelineStart))
+    }
+}
+
+impl Deref for TimelineItem {
+    type Target = TimelineItemKind;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kind
     }
 }
 
