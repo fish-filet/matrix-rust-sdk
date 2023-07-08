@@ -49,7 +49,7 @@ tracing-core = "0.1.30"
 uniffi = { git = "https://github.com/mozilla/uniffi-rs", rev = "a123d11c7aede132c4210a69c2537ba7ceac3b24" }
 uniffi_bindgen = { git = "https://github.com/mozilla/uniffi-rs", rev = "a123d11c7aede132c4210a69c2537ba7ceac3b24" }
 vodozemac = { git = "https://github.com/fish-filet/vodozemac.git", branch = "custom-x25519-dalek-version"}
-zeroize = "1"
+zeroize = "1.5"
 
 # Default release profile, select with `--release`
 [profile.release]
