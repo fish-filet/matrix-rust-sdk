@@ -5544,8 +5544,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vodozemac"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56d1b4c112e19e1f9361e34c7a40d30bd7f1de0fec43b83f2f8383d6eee9f561"
+source = "git+https://github.com/fish-filet/vodozemac.git?branch=custom-x25519-dalek-version#86f555f87620f2a692f896c8a81c1ce7aa577562"
 dependencies = [
  "aes",
  "arrayvec",
@@ -5981,8 +5980,7 @@ dependencies = [
 [[package]]
 name = "x25519-dalek"
 version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2392b6b94a576b4e2bf3c5b2757d63f10ada8020a2e4d08ac849ebcf6ea8e077"
+source = "git+https://github.com/fish-filet/x25519-dalek.git?branch=zeroize-version-patch#dd54b1efa2b7c2e1c0e3294936cb1b2582bf5fa2"
 dependencies = [
  "curve25519-dalek",
  "rand_core 0.5.1",
